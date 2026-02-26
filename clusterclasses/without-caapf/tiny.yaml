@@ -14,7 +14,7 @@ spec:
       name: aws-rke2-tiny-no-caapf-cluster
   controlPlane:
     ref:
-      apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+      apiVersion: controlplane.cluster.x-k8s.io/v1beta1
       kind: RKE2ControlPlaneTemplate
       name: aws-rke2-tiny-no-caapf-cp
     machineInfrastructure:
@@ -28,7 +28,7 @@ spec:
         template:
           bootstrap:
             ref:
-              apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+              apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
               kind: RKE2ConfigTemplate
               name: aws-rke2-tiny-no-caapf-worker-bootstrap
           infrastructure:
@@ -182,7 +182,7 @@ spec:
 # manifestsConfigMapReference points to aws-ccm-manifests ConfigMap which contains
 # the full AWS CCM manifest set. RKE2 copies these to /var/lib/rancher/rke2/server/manifests/
 # on control-plane nodes and auto-deploys them cluster-wide.
-apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: RKE2ControlPlaneTemplate
 metadata:
   name: aws-rke2-tiny-no-caapf-cp
@@ -253,7 +253,7 @@ spec:
         insecureSkipSecretsManager: false
       nonRootVolumes: []
 ---
-apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: RKE2ConfigTemplate
 metadata:
   name: aws-rke2-tiny-no-caapf-worker-bootstrap

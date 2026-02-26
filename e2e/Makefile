@@ -88,14 +88,14 @@ apply-clusterclasses-no-caapf:  ## Phase 2 – apply without-CAAPF ClusterClasse
 # ── Phase 3: addon deployment ──────────────────────────────────────────────────
 
 .PHONY: apply-addons-caapf
-apply-addons-caapf:  ## Phase 3 – apply CAAPF HelmChartProxy addons
-	$(call log_step,Phase 3: apply HelmChartProxy addons)
+apply-addons-caapf:  ## Phase 3 – apply CAAPF HelmOp addons
+	$(call log_step,Phase 3: apply HelmOp addons)
 	@$(KUBECTL) apply -f with-caapf/addons/ccm.yaml
 	@$(KUBECTL) apply -f with-caapf/addons/csi.yaml
-	@echo "  HelmChartProxies applied"
-	@$(KUBECTL) wait helmchartproxies --all -n $(NAMESPACE) \
+	@echo "  HelmOps applied"
+	@$(KUBECTL) wait helmops --all -n $(NAMESPACE) \
 	  --for=condition=Ready \
-	  --timeout=2m 2>/dev/null || echo "  (helmchartproxies not yet populated - clusters not running yet)"
+	  --timeout=2m 2>/dev/null || echo "  (helmops not yet populated - clusters not running yet)"
 
 .PHONY: apply-addons-no-caapf
 apply-addons-no-caapf:  ## Phase 3 – apply ConfigMap + ClusterResourceSet addons
@@ -342,7 +342,7 @@ clean-no-caapf-clusters:  ## Delete all without-CAAPF workload clusters
 	done
 
 .PHONY: clean-addons
-clean-addons:  ## Remove addon resources (HelmChartProxies, CRS, ConfigMaps)
+clean-addons:  ## Remove addon resources (HelmOps, CRS, ConfigMaps)
 	$(call log_step,removing addon resources)
 	@$(KUBECTL) delete -f with-caapf/addons/ --ignore-not-found=true
 	@$(KUBECTL) delete -f without-caapf/addons/ --ignore-not-found=true
@@ -365,8 +365,8 @@ status:  ## Show cluster and addon status on the management cluster
 	@echo "=== Clusters ==="
 	@$(KUBECTL) get clusters -n $(NAMESPACE) -o wide 2>/dev/null || echo "  none"
 	@echo ""
-	@echo "=== HelmChartProxies ==="
-	@$(KUBECTL) get helmchartproxies -n $(NAMESPACE) 2>/dev/null || echo "  none"
+	@echo "=== HelmOps ==="
+	@$(KUBECTL) get helmops -n $(NAMESPACE) 2>/dev/null || echo "  none"
 	@echo ""
 	@echo "=== ClusterResourceSets ==="
 	@$(KUBECTL) get clusterresourcesets -n $(NAMESPACE) 2>/dev/null || echo "  none"

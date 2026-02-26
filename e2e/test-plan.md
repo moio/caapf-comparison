@@ -42,7 +42,7 @@ make -f e2e/Makefile clean-all
 
 | Check | Command | Pass criteria |
 |-------|---------|---------------|
-| HelmChartProxies accepted | `kubectl apply -f with-caapf/addons/` | No webhook rejections |
+| HelmOps accepted | `kubectl apply -f with-caapf/addons/` | No webhook rejections |
 
 ### Without CAAPF
 
@@ -73,7 +73,7 @@ Node providerIDs (`aws://...`) confirm that the CCM successfully initialised the
 ```
 clean-caapf-clusters     → delete Cluster objects, wait for AWS teardown
 clean-no-caapf-clusters  → same for without-CAAPF clusters
-clean-addons             → delete HelmChartProxies, ConfigMaps, ClusterResourceSets
+clean-addons             → delete HelmOps, ConfigMaps, ClusterResourceSets
 clean-clusterclasses     → delete all ClusterClass objects
 ```
 
