@@ -1,0 +1,22 @@
+# AWS credentials secret - substitute <AWS_ACCESS_KEY_ID> and <AWS_SECRET_ACCESS_KEY>
+# before applying. The secret must live in capa-system (same namespace as CAPA).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-identity-credentials
+  namespace: capa-system
+type: Opaque
+stringData:
+  AccessKeyID: "<AWS_ACCESS_KEY_ID>"
+  SecretAccessKey: "<AWS_SECRET_ACCESS_KEY>"
+---
+# AWSClusterStaticIdentity references the secret above.
+# The name "cluster-identity" is the default used by all ClusterClasses.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSClusterStaticIdentity
+metadata:
+  name: cluster-identity
+spec:
+  secretRef: cluster-identity-credentials
+  allowedNamespaces:
+    list: []          # empty list means all namespaces are allowed

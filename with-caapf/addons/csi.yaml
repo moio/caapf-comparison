@@ -1,0 +1,36 @@
+# HelmOp: AWS EBS CSI Driver
+# Targets clusters with label csi=aws-ebs-csi-driver that use one of the three
+# with-CAAPF ClusterClasses. CAAPF automatically adds the clusterclass-name label.
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: aws-ebs-csi-driver
+  namespace: default
+spec:
+  clusterSelector:
+    matchLabels:
+      csi: aws-ebs-csi-driver
+  repoURL: https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+  chartName: aws-ebs-csi-driver
+  # Pin to a tested version; bump deliberately
+  version: "2.33.0"
+  releaseName: aws-ebs-csi-driver
+  namespace: kube-system
+  valuesTemplate: |
+    controller:
+      hostNetwork: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+    node:
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+    storageClasses:
+      - name: ebs-sc
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
+        volumeBindingMode: WaitForFirstConsumer
+        reclaimPolicy: Delete
+        parameters:
+          type: gp3

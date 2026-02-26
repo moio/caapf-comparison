@@ -1,0 +1,128 @@
+# ConfigMap: aws-ccm-manifests
+# Referenced by manifestsConfigMapReference in all without-CAAPF RKE2ControlPlaneTemplates.
+# RKE2 copies each data entry to /var/lib/rancher/rke2/server/manifests/ on CP nodes,
+# which triggers auto-deployment cluster-wide.
+#
+# NOTE: The ConfigMap must be in the same namespace as the RKE2ControlPlane (default).
+# NOTE: This is applied once at CP init time - changes require manual reconciliation.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-ccm-manifests
+  namespace: default
+data:
+  # Each key becomes a file in /var/lib/rancher/rke2/server/manifests/
+  aws-ccm-serviceaccount.yaml: |
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: cloud-controller-manager
+      namespace: kube-system
+  aws-ccm-clusterrole.yaml: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: system:cloud-controller-manager
+      annotations:
+        rbac.authorization.kubernetes.io/autoupdate: "true"
+    rules:
+      - apiGroups: [""]
+        resources: [events]
+        verbs: [create, patch, update]
+      - apiGroups: [""]
+        resources: [nodes]
+        verbs: [get, list, update, delete, patch, watch]
+      - apiGroups: [""]
+        resources: [nodes/status]
+        verbs: [patch]
+      - apiGroups: [""]
+        resources: [services]
+        verbs: [list, watch, get, patch, update]
+      - apiGroups: [""]
+        resources: [services/status]
+        verbs: [update, patch]
+      - apiGroups: [""]
+        resources: [serviceaccounts]
+        verbs: [create, get, list, watch, update]
+      - apiGroups: [""]
+        resources: [persistentvolumes]
+        verbs: [get, list, update, watch]
+      - apiGroups: [""]
+        resources: [endpoints]
+        verbs: [create, get, list, watch, update]
+      - apiGroups: [""]
+        resources: [configmaps]
+        verbs: [get, list, watch]
+      - apiGroups: [""]
+        resources: [secrets]
+        verbs: [list, get, watch]
+      - apiGroups: [coordination.k8s.io]
+        resources: [leases]
+        verbs: [create, get, list, update, watch]
+  aws-ccm-clusterrolebinding.yaml: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: system:cloud-controller-manager
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: system:cloud-controller-manager
+    subjects:
+      - kind: ServiceAccount
+        name: cloud-controller-manager
+        namespace: kube-system
+  aws-ccm-rolebinding-auth-reader.yaml: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: cloud-controller-manager:apiserver-authentication-reader
+      namespace: kube-system
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: extension-apiserver-authentication-reader
+    subjects:
+      - kind: ServiceAccount
+        name: cloud-controller-manager
+        namespace: kube-system
+  aws-ccm-daemonset.yaml: |
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: aws-cloud-controller-manager
+      namespace: kube-system
+      labels:
+        k8s-app: aws-cloud-controller-manager
+    spec:
+      selector:
+        matchLabels:
+          k8s-app: aws-cloud-controller-manager
+      updateStrategy:
+        type: RollingUpdate
+      template:
+        metadata:
+          labels:
+            k8s-app: aws-cloud-controller-manager
+        spec:
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: ""
+          tolerations:
+            - key: node.cloudprovider.kubernetes.io/uninitialized
+              value: "true"
+              effect: NoSchedule
+            - key: node-role.kubernetes.io/control-plane
+              effect: NoSchedule
+          serviceAccountName: cloud-controller-manager
+          hostNetwork: true
+          priorityClassName: system-cluster-critical
+          containers:
+            - name: aws-cloud-controller-manager
+              image: registry.k8s.io/provider-aws/cloud-controller-manager:v1.30.1
+              args:
+                - --v=2
+                - --cloud-provider=aws
+                - --configure-cloud-routes=false
+              resources:
+                requests:
+                  cpu: 200m

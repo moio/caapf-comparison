@@ -1,0 +1,36 @@
+# CAPA - AWS Infrastructure Provider
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: aws
+  namespace: capa-system
+spec:
+  name: aws
+  type: infrastructure
+  version: v2.7.1
+  features:
+    clusterResourceSet: true
+  variables:
+    AWS_B64ENCODED_CREDENTIALS: ""
+---
+# CAPRKE2 Bootstrap Provider
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: rke2-bootstrap
+  namespace: rke2-bootstrap-system
+spec:
+  name: rke2
+  type: bootstrap
+  version: v0.9.0
+---
+# CAPRKE2 Control Plane Provider
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: rke2-control-plane
+  namespace: rke2-control-plane-system
+spec:
+  name: rke2
+  type: controlPlane
+  version: v0.9.0
