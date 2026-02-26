@@ -49,8 +49,11 @@ kubectl apply -f prerequisites/capi-providers.yaml
 # Wait for providers to become ready (~2-3 minutes)
 kubectl wait capiproviders --all --for=condition=Ready --timeout=5m -A
 
-# Configure AWS identity - edit the file first!
-# Replace <AWS_ACCESS_KEY_ID> and <AWS_SECRET_ACCESS_KEY>
+# Configure AWS identity from environment variables
+kubectl create secret generic cluster-identity-credentials -n capa-system \
+  --from-literal=AccessKeyID="$AWS_ACCESS_KEY_ID" \
+  --from-literal=SecretAccessKey="$AWS_SECRET_ACCESS_KEY" \
+  --save-config --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f prerequisites/aws-identity.yaml
 ```
 
