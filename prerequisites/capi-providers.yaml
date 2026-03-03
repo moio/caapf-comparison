@@ -34,3 +34,13 @@ spec:
   name: rke2
   type: controlPlane
   version: v0.9.0
+---
+# CAAPF - CAPI Addon provider fleet
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: fleet
+  namespace: fleet-addon-system
+spec:
+  name: rancher-fleet
+  type: addon
