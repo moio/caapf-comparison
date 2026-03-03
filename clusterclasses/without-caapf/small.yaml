@@ -1,6 +1,6 @@
 # ClusterClass: aws-rke2-small-no-caapf
 # Size: 1x t3.large CP, 2x t3.large workers, 50 GiB root volumes
-# Addon delivery: manifestsConfigMapReference (CCM) + ClusterResourceSet (CSI)
+# Addon delivery: ClusterResourceSet (CCM and CSI)
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: ClusterClass
@@ -274,9 +274,6 @@ spec:
         type: RollingUpdate
         rollingUpdate:
           maxSurge: 1
-      manifestsConfigMapReference:
-        name: aws-ccm-manifests
-        namespace: default
       preRKE2Commands:
         - |
           hostnamectl set-hostname "$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)"

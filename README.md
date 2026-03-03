@@ -7,7 +7,7 @@ This repository demonstrates two approaches to deploying cluster addons (AWS CCM
 | Approach | CCM delivery | CSI delivery | Reconciliation |
 |----------|-------------|-------------|----------------|
 | **With CAAPF** | `HelmOp` (Fleet) | `HelmOp` (Fleet) | Continuous drift correction |
-| **Without CAAPF** | `manifestsConfigMapReference` on RKE2ControlPlane | `ClusterResourceSet` | Apply-once (no drift correction) |
+| **Without CAAPF** | `ClusterResourceSet` | `ClusterResourceSet` | Apply-once (no drift correction) |
 
 Three ClusterClass sizes are provided (tiny / small / medium). Two example Cluster resources per size demonstrate ClusterClass reuse.
 
@@ -31,7 +31,7 @@ with-caapf/
   addons/               # HelmOp for CCM and EBS CSI
   clusters/             # 6 Cluster resources
 without-caapf/
-  addons/               # ConfigMap (CCM) + ClusterResourceSet (CSI)
+  addons/               # ClusterResourceSets for CCM and EBS CSI
   clusters/             # 6 Cluster resources
 Makefile                # Test orchestration — see targets below
 test/scripts/           # Bash scripts called by Make targets
@@ -71,7 +71,7 @@ This single command will:
 make test-tiny-no-caapf
 ```
 
-Same flow, but uses the without-CAAPF ClusterClass, CCM ConfigMap, and CSI ClusterResourceSet instead of HelmOps.
+Same flow, but uses the without-CAAPF ClusterClass and ClusterResourceSets (CCM + CSI) instead of HelmOps.
 
 ### Cleanup
 
@@ -91,7 +91,7 @@ Run `make help` to list all targets (works without env vars). Key targets:
 | `apply-clusterclasses-caapf` | Apply all with-CAAPF ClusterClasses |
 | `apply-clusterclasses-no-caapf` | Apply all without-CAAPF ClusterClasses |
 | `apply-addons-caapf` | Apply HelmOp addons (CCM + CSI) |
-| `apply-addons-no-caapf` | Apply ConfigMap + ClusterResourceSet addons |
+| `apply-addons-no-caapf` | Apply ClusterResourceSet addons (CCM + CSI) |
 | `test-tiny-caapf` | End-to-end: prereqs + clusterclasses + addons + create + verify (tiny, CAAPF) |
 | `test-small-caapf` | Same for small size |
 | `test-medium-caapf` | Same for medium size |
@@ -199,15 +199,15 @@ Export the three IDs and you are ready to run `make test-*`.
 
 | Aspect | With CAAPF | Without CAAPF |
 |--------|-----------|---------------|
-| CCM addon | ~30 lines (HelmOp) | ~120 lines (ConfigMap with embedded manifests) |
-| CSI addon | ~35 lines (HelmOp) | ~280 lines (ConfigMap + ClusterResourceSet) |
-| ClusterClass | Simpler (no extra fields) | Slightly more (manifestsConfigMapReference) |
+| CCM addon | ~30 lines (HelmOp) | ~120 lines (ConfigMap + ClusterResourceSet) |
+| CSI addon | ~35 lines (HelmOp) | ~300 lines (ConfigMap + ClusterResourceSet) |
+| ClusterClass | Identical | Identical |
 
 ### Reconciliation behaviour
 
 **With CAAPF**: Fleet continuously reconciles the Helm releases. If someone manually deletes the CCM DaemonSet, Fleet reinstalls it within seconds. Helm values can be updated in the HelmOp and Fleet rolls out the change to all matching clusters automatically.
 
-**Without CAAPF**: `strategy: ApplyOnce` means the ClusterResourceSet applies the CSI manifests exactly once when a matching cluster is created or the CRS is first applied. If manifests are subsequently deleted or modified in the workload cluster, they are NOT restored. The CCM via `manifestsConfigMapReference` is similarly static - it is embedded at cluster creation time.
+**Without CAAPF**: `strategy: ApplyOnce` means the ClusterResourceSet applies the CCM and CSI manifests exactly once when a matching cluster is created or the CRS is first applied. If manifests are subsequently deleted or modified in the workload cluster, they are NOT restored.
 
 ### Templating capabilities
 
@@ -225,7 +225,7 @@ Export the three IDs and you are ready to run `make test-*`.
 
 **With CAAPF**: `kubectl get helmops -n default`, `kubectl get bundledeployment -A`, and Fleet UI in Rancher give full visibility into addon state across all clusters.
 
-**Without CAAPF**: Check `kubectl get clusterresourceset` and `kubectl get clusterresourcesetbinding` for CRS status. For CCM, check RKE2 control-plane node logs at `/var/lib/rancher/rke2/agent/logs/rke2.log`.
+**Without CAAPF**: Check `kubectl get clusterresourceset` and `kubectl get clusterresourcesetbinding` for CRS status. CCM and CSI pods can be checked directly in the workload cluster's kube-system namespace.
 
 ## Customisation
 

@@ -1,6 +1,6 @@
 # ClusterClass: aws-rke2-medium
 # Size: 3x t3.xlarge CP, 3x t3.xlarge workers, 80 GiB root volumes
-# Addon delivery: CAAPF HelmOp (no manifestsConfigMapReference)
+# Addon delivery: CAAPF HelmOp
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: ClusterClass

@@ -1,6 +1,6 @@
 # ClusterClass: aws-rke2-tiny-no-caapf
 # Size: 1x t3.medium CP, 1x t3.medium worker, 30 GiB root volumes
-# Addon delivery: manifestsConfigMapReference (CCM) + ClusterResourceSet (CSI)
+# Addon delivery: ClusterResourceSet (CCM and CSI)
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: ClusterClass
@@ -251,9 +251,8 @@ spec:
             toPort: 2379
 ---
 # KEY DIFFERENCE from with-caapf variant:
-# manifestsConfigMapReference points to aws-ccm-manifests ConfigMap which contains
-# the full AWS CCM manifest set. RKE2 copies these to /var/lib/rancher/rke2/server/manifests/
-# on control-plane nodes and auto-deploys them cluster-wide.
+# CCM and CSI are deployed via ClusterResourceSet (ApplyOnce) rather than Fleet HelmOps.
+# This means addons are deployed once per cluster with no continuous reconciliation.
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: RKE2ControlPlaneTemplate
 metadata:
@@ -278,9 +277,6 @@ spec:
         type: RollingUpdate
         rollingUpdate:
           maxSurge: 1
-      manifestsConfigMapReference:
-        name: aws-ccm-manifests
-        namespace: default
       preRKE2Commands:
         - |
           hostnamectl set-hostname "$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)"

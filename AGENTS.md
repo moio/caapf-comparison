@@ -5,7 +5,7 @@
 A YAML-only reference repository comparing two approaches to deploying cluster addons (AWS CCM and EBS CSI) on RKE2 clusters provisioned on AWS via Cluster API (CAPI) and managed by Rancher Turtles.
 
 - **With CAAPF** — addons delivered by `HelmOp` resources
-- **Without CAAPF** — addons delivered by `manifestsConfigMapReference` on the RKE2ControlPlane (CCM) and a `ClusterResourceSet` (CSI)
+- **Without CAAPF** — addons delivered by `ClusterResourceSet` (both CCM and CSI)
 
 CNI is RKE2's built-in canal plugin in both variants and is not part of the comparison.
 
@@ -21,7 +21,7 @@ with-caapf/
   clusters/                 # Cluster resources
 without-caapf/
   addons/
-    ccm-configmap.yaml            # ConfigMap with CCM manifests
+    ccm-clusterresourceset.yaml   # ConfigMap (CCM) + ClusterResourceSet
     csi-clusterresourceset.yaml   # ConfigMap (CSI) + ClusterResourceSet
   clusters/                 # Cluster resources
 
@@ -36,7 +36,7 @@ Each ClusterClass file is a multi-document YAML containing all subordinate templ
 
 - Every ClusterClass exposes four topology variables: `region`, `sshKeyName` (required), `awsClusterIdentityName`, `amiID`. Defaults target `us-east-1` with the openSUSE Leap AMI.
 - `serverConfig.cni: canal` and `serverConfig.cloudProviderName: external` are set identically in both variants.
-- The **only** structural difference between a with-caapf and without-caapf ClusterClass is the presence of `manifestsConfigMapReference` on the RKE2ControlPlaneTemplate.
+- The **only** structural difference between a with-caapf and without-caapf ClusterClass is that the without-caapf variant relies on ClusterResourceSets for addon delivery instead of Fleet HelmOps. The ClusterClasses themselves are otherwise identical.
 - All Cluster resources use namespace `default` and pod CIDR `192.168.0.0/16`.
 - `sshKeyName` in cluster files is set to the placeholder `my-aws-keypair`, Makefile replaces it with `sed`.
 
@@ -46,7 +46,7 @@ Each ClusterClass file is a multi-document YAML containing all subordinate templ
 - **All resource names are namespaced by size and variant.** Pattern: `aws-rke2-{size}[-no-caapf]-{role}`. Never reuse a name across variants.
 - **ClusterClass files are self-contained.** All subordinate templates referenced by a ClusterClass live in the same file as the ClusterClass itself.
 - **Addon files target by label, not by name.** `HelmOp.spec.targets[].clusterSelector` and `ClusterResourceSet.spec.clusterSelector` use label selectors; they must never hard-code cluster names.
-- **ConfigMap data keys in `ccm-configmap.yaml` must each be valid standalone YAML** — they are written verbatim to `/var/lib/rancher/rke2/server/manifests/` by RKE2.
+- **ConfigMap data keys in ClusterResourceSet manifests must each be valid standalone YAML** — they are applied verbatim to the workload cluster.
 - **e2e Makefile targets are idempotent.** Every `apply` step must be safe to re-run. Cleanup targets must use `--ignore-not-found=true`.
 - **No secrets in tracked files.** `prerequisites/aws-identity.yaml` contains no credentials — it only references a Secret by name (`cluster-identity-credentials`) that is created at runtime by `apply-prereqs.sh`. Real credentials must never be committed.
 - **Versions are pinned, not floating.** Chart versions in HelmOp, container image tags in ConfigMap manifests, and the RKE2 version in Cluster files must all be explicit. Do not use `latest` or unversioned references.
