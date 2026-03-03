@@ -93,19 +93,19 @@ test-medium-caapf: apply-prereqs apply-clusterclasses-caapf apply-addons-caapf #
 # ── single-cluster tests (without-CAAPF) ──────────────────────────────────────
 
 .PHONY: test-tiny-no-caapf
-test-tiny-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Full test: tiny-cluster-1 without CAAPF
-	@$(SCRIPTS)/apply-cluster.sh without-caapf tiny-cluster-1 $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID)
-	@$(SCRIPTS)/verify-cluster.sh tiny-cluster-1
+test-tiny-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Full test: tiny-cluster-1-nc without CAAPF
+	@$(SCRIPTS)/apply-cluster.sh without-caapf tiny-cluster-1-nc $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID)
+	@$(SCRIPTS)/verify-cluster.sh tiny-cluster-1-nc
 
 .PHONY: test-small-no-caapf
-test-small-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Full test: small-cluster-1 without CAAPF
-	@$(SCRIPTS)/apply-cluster.sh without-caapf small-cluster-1 $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID)
-	@$(SCRIPTS)/verify-cluster.sh small-cluster-1
+test-small-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Full test: small-cluster-1-nc without CAAPF
+	@$(SCRIPTS)/apply-cluster.sh without-caapf small-cluster-1-nc $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID)
+	@$(SCRIPTS)/verify-cluster.sh small-cluster-1-nc
 
 .PHONY: test-medium-no-caapf
-test-medium-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Full test: medium-cluster-1 without CAAPF
-	@$(SCRIPTS)/apply-cluster.sh without-caapf medium-cluster-1 $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID)
-	@$(SCRIPTS)/verify-cluster.sh medium-cluster-1
+test-medium-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Full test: medium-cluster-1-nc without CAAPF
+	@$(SCRIPTS)/apply-cluster.sh without-caapf medium-cluster-1-nc $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID)
+	@$(SCRIPTS)/verify-cluster.sh medium-cluster-1-nc
 
 # ── full matrix ────────────────────────────────────────────────────────────────
 
@@ -113,16 +113,24 @@ test-medium-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-n
 test-all: test-all-caapf test-all-no-caapf ## Run full matrix (both variants)
 
 .PHONY: test-all-caapf
-test-all-caapf: apply-prereqs apply-clusterclasses-caapf apply-addons-caapf ## Run all 6 with-CAAPF clusters
+test-all-caapf: apply-prereqs apply-clusterclasses-caapf apply-addons-caapf ## Run all 6 with-CAAPF clusters (parallel)
+	@echo "==> Creating all with-CAAPF clusters..."
 	@for cluster in tiny-cluster-1 tiny-cluster-2 small-cluster-1 small-cluster-2 medium-cluster-1 medium-cluster-2; do \
-	  $(SCRIPTS)/apply-cluster.sh with-caapf $$cluster $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID) && \
+	  $(SCRIPTS)/apply-cluster.sh with-caapf $$cluster $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID) || exit 1; \
+	done
+	@echo "==> Verifying all with-CAAPF clusters..."
+	@for cluster in tiny-cluster-1 tiny-cluster-2 small-cluster-1 small-cluster-2 medium-cluster-1 medium-cluster-2; do \
 	  $(SCRIPTS)/verify-cluster.sh $$cluster || exit 1; \
 	done
 
 .PHONY: test-all-no-caapf
-test-all-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Run all 6 without-CAAPF clusters
-	@for cluster in tiny-cluster-1 tiny-cluster-2 small-cluster-1 small-cluster-2 medium-cluster-1 medium-cluster-2; do \
-	  $(SCRIPTS)/apply-cluster.sh without-caapf $$cluster $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID) && \
+test-all-no-caapf: apply-prereqs apply-clusterclasses-no-caapf apply-addons-no-caapf ## Run all 6 without-CAAPF clusters (parallel)
+	@echo "==> Creating all without-CAAPF clusters..."
+	@for cluster in tiny-cluster-1-nc tiny-cluster-2-nc small-cluster-1-nc small-cluster-2-nc medium-cluster-1-nc medium-cluster-2-nc; do \
+	  $(SCRIPTS)/apply-cluster.sh without-caapf $$cluster $(SSH_KEY_NAME) $(REGION) $(AMI_ID) $(VPC_ID) $(PRIVATE_SUBNET_ID) $(PUBLIC_SUBNET_ID) || exit 1; \
+	done
+	@echo "==> Verifying all without-CAAPF clusters..."
+	@for cluster in tiny-cluster-1-nc tiny-cluster-2-nc small-cluster-1-nc small-cluster-2-nc medium-cluster-1-nc medium-cluster-2-nc; do \
 	  $(SCRIPTS)/verify-cluster.sh $$cluster || exit 1; \
 	done
 
