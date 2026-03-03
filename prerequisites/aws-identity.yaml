@@ -7,4 +7,4 @@ metadata:
 spec:
   secretRef: cluster-identity-credentials
   allowedNamespaces:
-    list: []          # empty list means all namespaces are allowed
+    selector: {}      # empty selector matches all namespaces
