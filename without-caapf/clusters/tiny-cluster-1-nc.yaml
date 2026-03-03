@@ -1,7 +1,7 @@
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  name: small-cluster-1
+  name: tiny-cluster-1-nc
   namespace: default
   labels:
     cluster-api.cattle.io/rancher-auto-import: "true"
@@ -13,7 +13,7 @@ spec:
       cidrBlocks:
         - 192.168.0.0/16
   topology:
-    class: aws-rke2-small-no-caapf
+    class: aws-rke2-tiny-no-caapf
     version: v1.30.4+rke2r1
     variables:
       - name: sshKeyName
@@ -22,4 +22,4 @@ spec:
       machineDeployments:
         - class: default-worker
           name: md-0
-          replicas: 2
+          replicas: 1
