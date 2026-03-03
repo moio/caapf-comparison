@@ -60,6 +60,24 @@ spec:
         openAPIV3Schema:
           type: string
           default: ami-095197d9bbe1d2fb3
+    - name: vpcID
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: string
+          description: ID of existing VPC to use (e.g. vpc-0123456789abcdef0)
+    - name: privateSubnetID
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: string
+          description: ID of existing private subnet; NAT gateway must be pre-configured externally
+    - name: publicSubnetID
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: string
+          description: ID of existing public subnet used for load balancers
   patches:
     - name: region
       definitions:
@@ -149,6 +167,32 @@ spec:
               path: /spec/template/spec/infrastructureRef/name
               valueFrom:
                 variable: builtin.controlPlane.machineTemplate.infrastructureRef.name
+    - name: vpcID
+      definitions:
+        - selector:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+            kind: AWSClusterTemplate
+            matchResources:
+              infrastructureCluster: true
+          jsonPatches:
+            - op: add
+              path: /spec/template/spec/network/vpc/id
+              valueFrom:
+                variable: vpcID
+    - name: subnets
+      definitions:
+        - selector:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+            kind: AWSClusterTemplate
+            matchResources:
+              infrastructureCluster: true
+          jsonPatches:
+            - op: add
+              path: /spec/template/spec/network/subnets
+              valueFrom:
+                template: |
+                  - id: {{ .privateSubnetID }}
+                  - id: {{ .publicSubnetID }}
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSClusterTemplate
@@ -162,8 +206,8 @@ spec:
         kind: AWSClusterStaticIdentity
         name: cluster-identity
       network:
-        vpc:
-          availabilityZoneUsageLimit: 1
+        vpc: {}         # vpc.id added by patch
+        # subnets added by patch
         cni:
           cniIngressRules:
             - description: Canal VXLAN

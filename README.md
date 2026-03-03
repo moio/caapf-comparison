@@ -17,6 +17,7 @@ Three ClusterClass sizes are provided (tiny / small / medium). Two example Clust
 - **kubectl** configured against the management cluster
 - **AWS credentials** (access key + secret) with EC2, IAM, and ELB permissions
 - **An SSH key pair** already imported into the target AWS region (`us-east-1` by default)
+- **An existing VPC** with a public subnet and a private subnet (see [VPC setup](#vpc-setup) below)
 - For the with-CAAPF variant: CAAPF (Fleet addon provider) installed
 
 ## Directory Layout
@@ -38,13 +39,16 @@ test/scripts/           # Bash scripts called by Make targets
 
 ## Quick Start
 
-All operations are driven by `make`. Set four environment variables, then run a target:
+All operations are driven by `make`. Set the required environment variables, then run a target:
 
 ```bash
 export KUBECONFIG=/path/to/management-cluster.yaml
 export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
 export SSH_KEY_NAME=my-aws-keypair       # your EC2 key pair name
+export VPC_ID=vpc-0abc...                # existing VPC (see VPC setup below)
+export PRIVATE_SUBNET_ID=subnet-0abc...  # private subnet with NAT pre-configured
+export PUBLIC_SUBNET_ID=subnet-0def...   # public subnet for load balancers
 ```
 
 ### Run a single test (with CAAPF)
@@ -57,7 +61,7 @@ This single command will:
 1. Apply prerequisite namespaces, CAPI providers, and AWS identity
 2. Apply all three with-CAAPF ClusterClasses (tiny, small, medium)
 3. Apply HelmOp addons (CCM + CSI)
-4. Create `tiny-cluster-1`, substituting your SSH key, region, and AMI
+4. Create `tiny-cluster-1`, injecting your SSH key, region, AMI, VPC, and subnet IDs
 5. Wait for the cluster to become Ready (~5-10 min)
 6. Verify nodes, CCM, Canal CNI, EBS CSI, and providerIDs on the workload cluster
 
@@ -104,6 +108,18 @@ Run `make help` to list all targets (works without env vars). Key targets:
 | `clean-all` | Full cleanup: clusters + addons + ClusterClasses |
 | `status` | Show current clusters, HelmOps, and ClusterResourceSets |
 
+### Required environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `KUBECONFIG` | Path to management cluster kubeconfig |
+| `AWS_ACCESS_KEY_ID` | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
+| `SSH_KEY_NAME` | EC2 key pair name already imported in the target region |
+| `VPC_ID` | Existing VPC ID (e.g. `vpc-0123456789abcdef0`) |
+| `PRIVATE_SUBNET_ID` | Existing private subnet ID; NAT gateway must be pre-configured externally |
+| `PUBLIC_SUBNET_ID` | Existing public subnet ID used for the NLB |
+
 ### Optional environment variables
 
 | Variable | Default | Description |
@@ -116,6 +132,66 @@ Override at invocation time:
 ```bash
 make test-tiny-caapf REGION=eu-west-1 AMI_ID=ami-xxxxxxxxxxxxxxxxx
 ```
+
+## VPC Setup
+
+All clusters share a single pre-existing VPC. CAPA will reuse the VPC and subnets you provide and will **not** create any VPC, subnets, NAT gateways, or internet gateways.
+
+### Required VPC infrastructure
+
+You must create the following before running any `make` target (once, shared by all clusters):
+
+1. **VPC** — any CIDR block (e.g. `10.0.0.0/16`)
+2. **Internet Gateway** — attached to the VPC
+3. **Public subnet** — route to the Internet Gateway; tag with `kubernetes.io/role/elb=1`
+4. **NAT Gateway** — in the public subnet, with an Elastic IP
+5. **Private subnet** — route to the NAT Gateway; tag with `kubernetes.io/role/internal-elb=1`
+
+Both subnets should also carry `kubernetes.io/cluster/<cluster-name>=shared` (or `owned`) for each cluster that will use them, so the AWS cloud provider can discover them.
+
+### Example (AWS CLI)
+
+```bash
+# VPC
+VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 \
+  --query Vpc.VpcId --output text)
+
+# Internet gateway
+IGW_ID=$(aws ec2 create-internet-gateway --query InternetGateway.InternetGatewayId --output text)
+aws ec2 attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
+
+# Public subnet
+PUBLIC_SUBNET_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID \
+  --cidr-block 10.0.0.0/24 --availability-zone us-east-1a \
+  --query Subnet.SubnetId --output text)
+aws ec2 create-tags --resources $PUBLIC_SUBNET_ID \
+  --tags Key=kubernetes.io/role/elb,Value=1
+PUB_RT=$(aws ec2 create-route-table --vpc-id $VPC_ID --query RouteTable.RouteTableId --output text)
+aws ec2 create-route --route-table-id $PUB_RT --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
+aws ec2 associate-route-table --route-table-id $PUB_RT --subnet-id $PUBLIC_SUBNET_ID
+
+# NAT gateway
+EIP_ALLOC=$(aws ec2 allocate-address --domain vpc --query AllocationId --output text)
+NAT_ID=$(aws ec2 create-nat-gateway --subnet-id $PUBLIC_SUBNET_ID \
+  --allocation-id $EIP_ALLOC --query NatGateway.NatGatewayId --output text)
+aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_ID
+
+# Private subnet
+PRIVATE_SUBNET_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID \
+  --cidr-block 10.0.1.0/24 --availability-zone us-east-1a \
+  --query Subnet.SubnetId --output text)
+aws ec2 create-tags --resources $PRIVATE_SUBNET_ID \
+  --tags Key=kubernetes.io/role/internal-elb,Value=1
+PRIV_RT=$(aws ec2 create-route-table --vpc-id $VPC_ID --query RouteTable.RouteTableId --output text)
+aws ec2 create-route --route-table-id $PRIV_RT --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_ID
+aws ec2 associate-route-table --route-table-id $PRIV_RT --subnet-id $PRIVATE_SUBNET_ID
+
+echo "VPC_ID=$VPC_ID"
+echo "PUBLIC_SUBNET_ID=$PUBLIC_SUBNET_ID"
+echo "PRIVATE_SUBNET_ID=$PRIVATE_SUBNET_ID"
+```
+
+Export the three IDs and you are ready to run `make test-*`.
 
 ## Comparison
 
@@ -155,10 +231,11 @@ make test-tiny-caapf REGION=eu-west-1 AMI_ID=ami-xxxxxxxxxxxxxxxxx
 
 ### Changing the AWS region
 
-Override `REGION` and `AMI_ID` when calling make (the default AMI is specific to `us-east-1`):
+Override `REGION` and `AMI_ID` when calling make (the default AMI is specific to `us-east-1`). You must also supply `VPC_ID`, `PRIVATE_SUBNET_ID`, and `PUBLIC_SUBNET_ID` for a VPC in that region:
 
 ```bash
-make test-tiny-caapf REGION=eu-west-1 AMI_ID=ami-xxxxxxxxxxxxxxxxx
+make test-tiny-caapf REGION=eu-west-1 AMI_ID=ami-xxxxxxxxxxxxxxxxx \
+  VPC_ID=vpc-… PRIVATE_SUBNET_ID=subnet-… PUBLIC_SUBNET_ID=subnet-…
 ```
 
 ### Finding the latest openSUSE Leap AMI
