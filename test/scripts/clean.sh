@@ -14,7 +14,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CLUSTER_WAIT_TIMEOUT="${CLUSTER_WAIT_TIMEOUT:-20m}"
 NAMESPACE="${NAMESPACE:-default}"
-ALL_CLUSTERS=(tiny-cluster-1 tiny-cluster-2 small-cluster-1 small-cluster-2 medium-cluster-1 medium-cluster-2)
+CAAPF_CLUSTERS=(tiny-cluster-1 tiny-cluster-2 small-cluster-1 small-cluster-2 medium-cluster-1 medium-cluster-2)
+NO_CAAPF_CLUSTERS=(tiny-cluster-1-nc tiny-cluster-2-nc small-cluster-1-nc small-cluster-2-nc medium-cluster-1-nc medium-cluster-2-nc)
 
 log() { echo "==> [$(date +%H:%M:%S)] $*"; }
 
@@ -22,7 +23,11 @@ delete_clusters() {
   local variant="$1"; shift
   local clusters=("$@")
   if [[ ${#clusters[@]} -eq 0 ]]; then
-    clusters=("${ALL_CLUSTERS[@]}")
+    if [[ "$variant" == "with-caapf" ]]; then
+      clusters=("${CAAPF_CLUSTERS[@]}")
+    else
+      clusters=("${NO_CAAPF_CLUSTERS[@]}")
+    fi
   fi
 
   log "deleting clusters (${variant}): ${clusters[*]}"
