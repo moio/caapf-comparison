@@ -6,8 +6,8 @@ This repository demonstrates two approaches to deploying cluster addons (AWS CCM
 
 | Approach | CCM delivery | CSI delivery | Reconciliation |
 |----------|-------------|-------------|----------------|
-| **With CAAPF** | `HelmOp` (Fleet) | `HelmOp` (Fleet) | Continuous drift correction |
-| **Without CAAPF** | `ClusterResourceSet` | `ClusterResourceSet` | Apply-once (no drift correction) |
+| **With CAAPF** | `HelmOp` (Fleet) | `HelmOp` (Fleet) | Continuous drift correction (Fleet) |
+| **Without CAAPF** | `ClusterResourceSet` → `HelmChart` CR | `ClusterResourceSet` → `HelmChart` CR | CRS apply-once; then RKE2 Helm controller reconciles within each cluster |
 
 Three ClusterClass sizes are provided (tiny / small / medium). Two example Cluster resources per size demonstrate ClusterClass reuse.
 
@@ -71,7 +71,7 @@ This single command will:
 make test-tiny-no-caapf
 ```
 
-Same flow, but uses the without-CAAPF ClusterClass and ClusterResourceSets (CCM + CSI) instead of HelmOps.
+Same flow, but uses the without-CAAPF ClusterClass and ClusterResourceSets (CCM + CSI via HelmChart CRs) instead of HelmOps.
 
 ### Cleanup
 
@@ -199,33 +199,33 @@ Export the three IDs and you are ready to run `make test-*`.
 
 | Aspect | With CAAPF | Without CAAPF |
 |--------|-----------|---------------|
-| CCM addon | ~30 lines (HelmOp) | ~120 lines (ConfigMap + ClusterResourceSet) |
-| CSI addon | ~35 lines (HelmOp) | ~300 lines (ConfigMap + ClusterResourceSet) |
+| CCM addon | ~34 lines (HelmOp) | ~66 lines (ConfigMap with HelmChart CR + ClusterResourceSet) |
+| CSI addon | ~38 lines (HelmOp) | ~68 lines (ConfigMap with HelmChart CR + ClusterResourceSet) |
 | ClusterClass | Identical | Identical |
 
 ### Reconciliation behaviour
 
-**With CAAPF**: Fleet continuously reconciles the Helm releases. If someone manually deletes the CCM DaemonSet, Fleet reinstalls it within seconds. Helm values can be updated in the HelmOp and Fleet rolls out the change to all matching clusters automatically.
+**With CAAPF**: Fleet continuously reconciles the Helm releases across all matching clusters. If someone manually deletes the CCM DaemonSet, Fleet reinstalls it within seconds. Helm values can be updated in the HelmOp and Fleet rolls out the change to all matching clusters automatically.
 
-**Without CAAPF**: `strategy: ApplyOnce` means the ClusterResourceSet applies the CCM and CSI manifests exactly once when a matching cluster is created or the CRS is first applied. If manifests are subsequently deleted or modified in the workload cluster, they are NOT restored.
+**Without CAAPF**: `strategy: ApplyOnce` means the ClusterResourceSet delivers the `HelmChart` CR to each matching cluster exactly once. From that point, RKE2's built-in Helm controller takes over and continuously reconciles the release within that cluster — so drift inside a cluster is corrected. However, there is no cross-cluster orchestration: updating the HelmChart version in the ConfigMap on the management cluster does NOT trigger an upgrade on already-bound clusters. To upgrade, you must delete the `ClusterResourceSetBinding` (to force re-delivery of the updated CR) or patch the `HelmChart` CR directly in each workload cluster.
 
 ### Templating capabilities
 
 **With CAAPF**: `spec.helm.values` in HelmOp supports inline YAML values, allowing per-cluster Helm value overrides. Adding a new cluster size or region-specific config requires only a ClusterClass variable change, not a new HelmOp.
 
-**Without CAAPF**: ConfigMaps contain static manifests. Per-cluster customisation requires separate ConfigMaps per variant, making the approach brittle at scale.
+**Without CAAPF**: The `HelmChart` CR's `valuesContent` field contains static Helm values. All clusters targeted by a given ClusterResourceSet receive the same values. Per-cluster customisation requires separate ConfigMaps per variant, making the approach brittle at scale. That said, the without-CAAPF variant now uses the same upstream chart as the with-CAAPF variant — no hand-maintained manifests, no risk of image tag drift.
 
 ### Upgrade path
 
 **With CAAPF**: Bump `version` in HelmOp. Fleet rolls out the upgrade to all matching clusters in a controlled sequence.
 
-**Without CAAPF**: Update the ConfigMap data and re-apply each affected workload cluster manifest manually. ClusterResourceSet `ApplyOnce` strategy means it will NOT apply again even if the ConfigMap changes - you must either delete the ClusterResourceSetBinding or switch to `strategy: Reconcile` (which has its own caveats).
+**Without CAAPF**: Bump `spec.version` in the `HelmChart` CR inside the ConfigMap on the management cluster. The ClusterResourceSet will NOT re-apply to already-bound clusters (ApplyOnce). To trigger the upgrade, delete the `ClusterResourceSetBinding` for each target cluster, which causes the CRS to re-deliver the updated `HelmChart` CR. RKE2's Helm controller then performs the Helm upgrade within each cluster.
 
 ### Debugging experience
 
 **With CAAPF**: `kubectl get helmops -n default`, `kubectl get bundledeployment -A`, and Fleet UI in Rancher give full visibility into addon state across all clusters.
 
-**Without CAAPF**: Check `kubectl get clusterresourceset` and `kubectl get clusterresourcesetbinding` for CRS status. CCM and CSI pods can be checked directly in the workload cluster's kube-system namespace.
+**Without CAAPF**: Check `kubectl get clusterresourceset` and `kubectl get clusterresourcesetbinding` for CRS delivery status. Then check `kubectl get helmchart -n kube-system` in the workload cluster to see if the `HelmChart` CRs were delivered and what state the Helm controller reports. CCM and CSI pods can be inspected directly in `kube-system`.
 
 ## Customisation
 

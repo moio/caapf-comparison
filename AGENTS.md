@@ -5,7 +5,7 @@
 A YAML-only reference repository comparing two approaches to deploying cluster addons (AWS CCM and EBS CSI) on RKE2 clusters provisioned on AWS via Cluster API (CAPI) and managed by Rancher Turtles.
 
 - **With CAAPF** — addons delivered by `HelmOp` resources
-- **Without CAAPF** — addons delivered by `ClusterResourceSet` (both CCM and CSI)
+- **Without CAAPF** — addons delivered by `ClusterResourceSet`; each ClusterResourceSet carries a ConfigMap containing an RKE2 `HelmChart` CR. The ClusterResourceSet delivers the CR once; RKE2's built-in Helm controller then installs and continuously reconciles the release within the workload cluster.
 
 CNI is RKE2's built-in canal plugin in both variants and is not part of the comparison.
 
@@ -21,8 +21,8 @@ with-caapf/
   clusters/                 # Cluster resources
 without-caapf/
   addons/
-    ccm-clusterresourceset.yaml   # ConfigMap (CCM) + ClusterResourceSet
-    csi-clusterresourceset.yaml   # ConfigMap (CSI) + ClusterResourceSet
+    ccm-clusterresourceset.yaml   # ConfigMap (HelmChart CR for CCM) + ClusterResourceSet
+    csi-clusterresourceset.yaml   # ConfigMap (HelmChart CR for CSI) + ClusterResourceSet
   clusters/                 # Cluster resources
 
 Makefile                    # thin wrapper calling test/scripts/*
@@ -46,7 +46,7 @@ Each ClusterClass file is a multi-document YAML containing all subordinate templ
 - **All resource names are namespaced by size and variant.** Pattern: `aws-rke2-{size}[-no-caapf]-{role}`. Never reuse a name across variants.
 - **ClusterClass files are self-contained.** All subordinate templates referenced by a ClusterClass live in the same file as the ClusterClass itself.
 - **Addon files target by label, not by name.** `HelmOp.spec.targets[].clusterSelector` and `ClusterResourceSet.spec.clusterSelector` use label selectors; they must never hard-code cluster names.
-- **ConfigMap data keys in ClusterResourceSet manifests must each be valid standalone YAML** — they are applied verbatim to the workload cluster.
+- **ConfigMap data keys in ClusterResourceSet manifests must each be valid standalone YAML** — they are applied verbatim to the workload cluster. For the without-CAAPF addons, each key contains a single `HelmChart` CR (`helm.cattle.io/v1`); RKE2's Helm controller reconciles the release from there.
 - **e2e Makefile targets are idempotent.** Every `apply` step must be safe to re-run. Cleanup targets must use `--ignore-not-found=true`.
 - **No secrets in tracked files.** `prerequisites/aws-identity.yaml` contains no credentials — it only references a Secret by name (`cluster-identity-credentials`) that is created at runtime by `apply-prereqs.sh`. Real credentials must never be committed.
-- **Versions are pinned, not floating.** Chart versions in HelmOp, container image tags in ConfigMap manifests, and the RKE2 version in Cluster files must all be explicit. Do not use `latest` or unversioned references.
+- **Versions are pinned, not floating.** Chart versions in HelmOp, chart versions in HelmChart CRs, and the RKE2 version in Cluster files must all be explicit. Do not use `latest` or unversioned references.

@@ -1,8 +1,16 @@
 # ConfigMap + ClusterResourceSet: AWS Cloud Controller Manager
 #
+# The ConfigMap contains a single RKE2 HelmChart CR. When the ClusterResourceSet
+# applies it to a workload cluster, RKE2's built-in Helm controller installs the
+# upstream aws-cloud-controller-manager chart — no hand-maintained manifests needed.
+#
+# spec.bootstrap: true ensures CCM installs before nodes are fully registered,
+# which is required because uninitialized nodes carry the
+# node.cloudprovider.kubernetes.io/uninitialized taint.
+#
 # The ClusterResourceSet targets clusters with label ccm=external.
-# strategy: ApplyOnce means it is deployed exactly once per cluster - no continuous
-# reconciliation. This is the key behavioral difference from CAAPF HelmOps.
+# strategy: ApplyOnce delivers the HelmChart CR once; from that point RKE2's
+# Helm controller takes over and continuously reconciles the release.
 #
 # NOTE: Both resources must be in the same namespace as the Cluster (default).
 # NOTE: Requires clusterResourceSet: true on the CAPA CAPIProvider (set in capi-providers.yaml).
@@ -13,115 +21,36 @@ metadata:
   name: aws-ccm-crs-manifests
   namespace: default
 data:
-  aws-ccm.yaml: |
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: cloud-controller-manager
-      namespace: kube-system
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole
-    metadata:
-      name: system:cloud-controller-manager
-    rules:
-    - apiGroups: [""]
-      resources: [events]
-      verbs: [create,patch,update]
-    - apiGroups: [""]
-      resources: [nodes]
-      verbs: [get,list,update,delete,patch,watch]
-    - apiGroups: [""]
-      resources: [nodes/status]
-      verbs: [patch]
-    - apiGroups: [""]
-      resources: [services]
-      verbs: [list,watch,get,patch,update]
-    - apiGroups: [""]
-      resources: [services/status]
-      verbs: [update,patch]
-    - apiGroups: [""]
-      resources: [serviceaccounts]
-      verbs: [create,get,list,watch,update]
-    - apiGroups: [""]
-      resources: [persistentvolumes]
-      verbs: [get,list,update,watch]
-    - apiGroups: [""]
-      resources: [endpoints]
-      verbs: [create,get,list,watch,update]
-    - apiGroups: [""]
-      resources: [configmaps,secrets]
-      verbs: [get,list,watch]
-    - apiGroups: [coordination.k8s.io]
-      resources: [leases]
-      verbs: [create,get,list,update,watch]
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
-    metadata:
-      name: system:cloud-controller-manager
-    roleRef:
-      apiGroup: rbac.authorization.k8s.io
-      kind: ClusterRole
-      name: system:cloud-controller-manager
-    subjects:
-    - kind: ServiceAccount
-      name: cloud-controller-manager
-      namespace: kube-system
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: RoleBinding
-    metadata:
-      name: cloud-controller-manager:apiserver-authentication-reader
-      namespace: kube-system
-    roleRef:
-      apiGroup: rbac.authorization.k8s.io
-      kind: Role
-      name: extension-apiserver-authentication-reader
-    subjects:
-    - kind: ServiceAccount
-      name: cloud-controller-manager
-      namespace: kube-system
-    ---
-    apiVersion: apps/v1
-    kind: DaemonSet
+  aws-ccm-helmchart.yaml: |
+    apiVersion: helm.cattle.io/v1
+    kind: HelmChart
     metadata:
       name: aws-cloud-controller-manager
       namespace: kube-system
-      labels:
-        k8s-app: aws-cloud-controller-manager
     spec:
-      selector:
-        matchLabels:
-          k8s-app: aws-cloud-controller-manager
-      updateStrategy:
-        type: RollingUpdate
-      template:
-        metadata:
-          labels:
-            k8s-app: aws-cloud-controller-manager
-        spec:
-          nodeSelector:
-            node-role.kubernetes.io/control-plane: "true"
-          tolerations:
+      repo: https://kubernetes.github.io/cloud-provider-aws
+      chart: aws-cloud-controller-manager
+      version: "0.0.8"
+      targetNamespace: kube-system
+      bootstrap: true
+      valuesContent: |-
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: "true"
+        tolerations:
           - key: node.cloudprovider.kubernetes.io/uninitialized
             value: "true"
             effect: NoSchedule
           - key: node-role.kubernetes.io/control-plane
             effect: NoSchedule
-          serviceAccountName: cloud-controller-manager
-          hostNetwork: true
-          priorityClassName: system-cluster-critical
-          containers:
-          - name: aws-cloud-controller-manager
-            image: registry.k8s.io/provider-aws/cloud-controller-manager:v1.30.1
-            args: [--v=2,--cloud-provider=aws,--configure-cloud-routes=false]
-            resources:
-              requests:
-                cpu: 200m
+        args:
+          - --v=2
+          - --cloud-provider=aws
+          - --configure-cloud-routes=false
+        hostNetworking: true
 ---
 # ClusterResourceSet: applies the ConfigMap above to all clusters
-# with label ccm=external. strategy: ApplyOnce means no drift correction.
+# with label ccm=external. strategy: ApplyOnce delivers the HelmChart CR once;
+# RKE2's Helm controller then reconciles the release continuously.
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet
 metadata:
