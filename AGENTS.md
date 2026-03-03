@@ -22,8 +22,9 @@ with-caapf/
 without-caapf/
   addons/                   # ConfigMap (CCM) + ClusterResourceSet + ConfigMap (CSI)
   clusters/                 # 6 Cluster resources (2 per size)
-e2e/
-  Makefile                  # test targets: check-prereqs, test-tiny-caapf, test-all, clean-all, …
+Makefile                    # thin wrapper calling test/scripts/*
+test/
+  scripts/                  # bash scripts: apply-prereqs, apply-clusterclasses, apply-addons, etc.
   test-plan.md              # human-readable description of each test phase
 ```
 

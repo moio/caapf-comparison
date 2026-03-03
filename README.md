@@ -32,77 +32,89 @@ with-caapf/
 without-caapf/
   addons/               # ConfigMap (CCM) + ClusterResourceSet (CSI)
   clusters/             # 6 Cluster resources
-e2e/                    # Makefile-based test suite
+Makefile                # Test orchestration — see targets below
+test/scripts/           # Bash scripts called by Make targets
 ```
 
-## Installation
+## Quick Start
 
-### 1. Shared prerequisites (both variants)
+All operations are driven by `make`. Set four environment variables, then run a target:
 
 ```bash
-# Create namespaces
-kubectl apply -f prerequisites/namespaces.yaml
-
-# Install CAPI providers (CAPA + CAPRKE2)
-kubectl apply -f prerequisites/capi-providers.yaml
-
-# Wait for providers to become ready (~2-3 minutes)
-kubectl wait capiproviders --all --for=condition=Ready --timeout=5m -A
-
-# Configure AWS identity from environment variables
-kubectl create secret generic cluster-identity-credentials -n capa-system \
-  --from-literal=AccessKeyID="$AWS_ACCESS_KEY_ID" \
-  --from-literal=SecretAccessKey="$AWS_SECRET_ACCESS_KEY" \
-  --save-config --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -f prerequisites/aws-identity.yaml
+export KUBECONFIG=/path/to/management-cluster.yaml
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export SSH_KEY_NAME=my-aws-keypair       # your EC2 key pair name
 ```
 
-### 2a. Additional prerequisite for with-CAAPF variant
+### Run a single test (with CAAPF)
 
 ```bash
-kubectl apply -f prerequisites/caapf-provider.yaml
-kubectl wait capiprovider fleet -n fleet-addon-system --for=condition=Ready --timeout=5m
+make test-tiny-caapf
 ```
 
-## Usage: With CAAPF
+This single command will:
+1. Apply prerequisite namespaces, CAPI providers, and AWS identity
+2. Apply all three with-CAAPF ClusterClasses (tiny, small, medium)
+3. Apply HelmOp addons (CCM + CSI)
+4. Create `tiny-cluster-1`, substituting your SSH key, region, and AMI
+5. Wait for the cluster to become Ready (~5-10 min)
+6. Verify nodes, CCM, Canal CNI, EBS CSI, and providerIDs on the workload cluster
+
+### Run a single test (without CAAPF)
 
 ```bash
-# 1. Apply ClusterClasses
-kubectl apply -f clusterclasses/with-caapf/tiny.yaml
-kubectl apply -f clusterclasses/with-caapf/small.yaml
-kubectl apply -f clusterclasses/with-caapf/medium.yaml
-
-# 2. Apply HelmOps (CAAPF will install these on matching clusters automatically)
-kubectl apply -f with-caapf/addons/ccm.yaml
-kubectl apply -f with-caapf/addons/csi.yaml
-
-# 3. Create clusters (edit sshKeyName value before applying)
-kubectl apply -f with-caapf/clusters/tiny-cluster-1.yaml
-kubectl apply -f with-caapf/clusters/tiny-cluster-2.yaml
-
-# Wait for a cluster to be ready (up to 20 minutes)
-kubectl wait cluster/tiny-cluster-1 --for=condition=Ready --timeout=20m
+make test-tiny-no-caapf
 ```
 
-## Usage: Without CAAPF
+Same flow, but uses the without-CAAPF ClusterClass, CCM ConfigMap, and CSI ClusterResourceSet instead of HelmOps.
+
+### Cleanup
 
 ```bash
-# 1. Apply ClusterClasses
-kubectl apply -f clusterclasses/without-caapf/tiny.yaml
-kubectl apply -f clusterclasses/without-caapf/small.yaml
-kubectl apply -f clusterclasses/without-caapf/medium.yaml
+make clean-all
+```
 
-# 2. Apply addon resources
-# CCM ConfigMap (must exist before clusters are created)
-kubectl apply -f without-caapf/addons/ccm-configmap.yaml
-# EBS CSI ClusterResourceSet + ConfigMap
-kubectl apply -f without-caapf/addons/csi-clusterresourceset.yaml
+Deletes all workload clusters (waits for AWS resource cleanup), removes addons, and removes ClusterClasses.
 
-# 3. Create clusters (edit sshKeyName value before applying)
-kubectl apply -f without-caapf/clusters/tiny-cluster-1.yaml
-kubectl apply -f without-caapf/clusters/tiny-cluster-2.yaml
+## Makefile Targets
 
-kubectl wait cluster/tiny-cluster-1 --for=condition=Ready --timeout=20m
+Run `make help` to list all targets (works without env vars). Key targets:
+
+| Target | Description |
+|--------|-------------|
+| `apply-prereqs` | Validate cluster + AWS creds, apply namespaces, CAPI providers, and AWS identity |
+| `apply-clusterclasses-caapf` | Apply all with-CAAPF ClusterClasses |
+| `apply-clusterclasses-no-caapf` | Apply all without-CAAPF ClusterClasses |
+| `apply-addons-caapf` | Apply HelmOp addons (CCM + CSI) |
+| `apply-addons-no-caapf` | Apply ConfigMap + ClusterResourceSet addons |
+| `test-tiny-caapf` | End-to-end: prereqs + clusterclasses + addons + create + verify (tiny, CAAPF) |
+| `test-small-caapf` | Same for small size |
+| `test-medium-caapf` | Same for medium size |
+| `test-tiny-no-caapf` | End-to-end (tiny, no CAAPF) |
+| `test-small-no-caapf` | Same for small size |
+| `test-medium-no-caapf` | Same for medium size |
+| `test-all-caapf` | Run all 6 with-CAAPF clusters sequentially |
+| `test-all-no-caapf` | Run all 6 without-CAAPF clusters sequentially |
+| `test-all` | Full matrix — both variants, all sizes |
+| `clean-caapf-clusters` | Delete all with-CAAPF workload clusters |
+| `clean-no-caapf-clusters` | Delete all without-CAAPF workload clusters |
+| `clean-addons` | Remove addon resources |
+| `clean-clusterclasses` | Remove all ClusterClasses |
+| `clean-all` | Full cleanup: clusters + addons + ClusterClasses |
+| `status` | Show current clusters, HelmOps, and ClusterResourceSets |
+
+### Optional environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REGION` | `us-east-1` | AWS region |
+| `AMI_ID` | `ami-095197d9bbe1d2fb3` | EC2 AMI (openSUSE Leap 16.0, us-east-1) |
+
+Override at invocation time:
+
+```bash
+make test-tiny-caapf REGION=eu-west-1 AMI_ID=ami-xxxxxxxxxxxxxxxxx
 ```
 
 ## Comparison
@@ -139,42 +151,15 @@ kubectl wait cluster/tiny-cluster-1 --for=condition=Ready --timeout=20m
 
 **Without CAAPF**: Check `kubectl get clusterresourceset` and `kubectl get clusterresourcesetbinding` for CRS status. For CCM, check RKE2 control-plane node logs at `/var/lib/rancher/rke2/agent/logs/rke2.log`.
 
-## Cleanup
-
-```bash
-# Delete clusters first (triggers AWS resource cleanup)
-kubectl delete -f with-caapf/clusters/
-kubectl delete -f without-caapf/clusters/
-
-# Wait for clusters to be fully deleted before removing ClusterClasses
-kubectl wait clusters --all --for=delete --timeout=20m
-
-# Remove addons
-kubectl delete -f with-caapf/addons/
-kubectl delete -f without-caapf/addons/
-
-# Remove ClusterClasses
-kubectl delete -f clusterclasses/
-
-# Remove providers and identity (optional - preserves management cluster config)
-# kubectl delete -f prerequisites/
-```
-
 ## Customisation
 
 ### Changing the AWS region
 
-Override the `region` variable per cluster:
+Override `REGION` and `AMI_ID` when calling make (the default AMI is specific to `us-east-1`):
 
-```yaml
-variables:
-  - name: region
-    value: us-east-1
-  - name: sshKeyName
-    value: my-us-keypair
+```bash
+make test-tiny-caapf REGION=eu-west-1 AMI_ID=ami-xxxxxxxxxxxxxxxxx
 ```
-
-Update `amiID` too - the default AMI is specific to `eu-central-1`.
 
 ### Finding the latest openSUSE Leap AMI
 
@@ -183,7 +168,7 @@ aws ec2 describe-images \
   --owners aws-marketplace \
   --filters "Name=name,Values=openSUSE-Leap-15.6*" \
   --query "sort_by(Images, &CreationDate)[-1].ImageId" \
-  --region eu-central-1
+  --region us-east-1
 ```
 
 ### Adding a new cluster size
