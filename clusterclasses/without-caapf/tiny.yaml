@@ -42,7 +42,7 @@ spec:
       schema:
         openAPIV3Schema:
           type: string
-          default: eu-central-1
+          default: us-east-1
     - name: sshKeyName
       required: true
       schema:
@@ -59,7 +59,7 @@ spec:
       schema:
         openAPIV3Schema:
           type: string
-          default: ami-0a23a9827c6dab833
+          default: ami-095197d9bbe1d2fb3
   patches:
     - name: region
       definitions:
@@ -141,7 +141,7 @@ metadata:
 spec:
   template:
     spec:
-      region: eu-central-1
+      region: us-east-1
       identityRef:
         kind: AWSClusterStaticIdentity
         name: cluster-identity
@@ -227,7 +227,7 @@ spec:
       instanceType: t3.medium
       sshKeyName: placeholder
       ami:
-        id: ami-0a23a9827c6dab833
+        id: ami-095197d9bbe1d2fb3
       rootVolume:
         size: 30
       iamInstanceProfile: control-plane.cluster-api-provider-aws.sigs.k8s.io
@@ -245,7 +245,7 @@ spec:
       instanceType: t3.medium
       sshKeyName: placeholder
       ami:
-        id: ami-0a23a9827c6dab833
+        id: ami-095197d9bbe1d2fb3
       rootVolume:
         size: 30
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io

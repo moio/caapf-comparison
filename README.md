@@ -16,7 +16,7 @@ Three ClusterClass sizes are provided (tiny / small / medium). Two example Clust
 - **Rancher 2.13+** with Rancher Turtles (CAPI extension) installed on the management cluster
 - **kubectl** configured against the management cluster
 - **AWS credentials** (access key + secret) with EC2, IAM, and ELB permissions
-- **An SSH key pair** already imported into the target AWS region (`eu-central-1` by default)
+- **An SSH key pair** already imported into the target AWS region (`us-east-1` by default)
 - For the with-CAAPF variant: CAAPF (Fleet addon provider) installed
 
 ## Directory Layout
