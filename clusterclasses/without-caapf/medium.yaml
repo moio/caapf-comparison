@@ -174,17 +174,29 @@ spec:
               fromPort: 5473
               protocol: tcp
               toPort: 5473
+            # RKE2 supervisor — workers join via NLB:9345; CP SG must allow it
+            - description: RKE2 supervisor
+              fromPort: 9345
+              protocol: tcp
+              toPort: 9345
       controlPlaneLoadBalancer:
         loadBalancerType: nlb
+        additionalListeners:
+          - port: 9345
+            protocol: TCP
         ingressRules:
           - description: RKE2 supervisor
             fromPort: 9345
             protocol: tcp
             toPort: 9345
+            cidrBlocks:
+              - "0.0.0.0/0"
           - description: Kubernetes API
             fromPort: 6443
             protocol: tcp
             toPort: 6443
+            cidrBlocks:
+              - "0.0.0.0/0"
           - description: etcd peer
             fromPort: 2380
             protocol: tcp
