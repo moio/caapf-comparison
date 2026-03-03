@@ -133,6 +133,22 @@ spec:
               path: /spec/template/spec/ami/id
               valueFrom:
                 variable: amiID
+    - name: controlPlaneInfraRef
+      description: >-
+        Syncs the RKE2ControlPlane .spec.infrastructureRef to point at the
+        topology-generated AWSMachineTemplate so the RKE2 CP controller
+        (v0.9.x) clones the patched template, not the original.
+      definitions:
+        - selector:
+            apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+            kind: RKE2ControlPlaneTemplate
+            matchResources:
+              controlPlane: true
+          jsonPatches:
+            - op: replace
+              path: /spec/template/spec/infrastructureRef/name
+              valueFrom:
+                variable: builtin.controlPlane.machineTemplate.infrastructureRef.name
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSClusterTemplate
