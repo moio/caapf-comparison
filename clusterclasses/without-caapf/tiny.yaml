@@ -227,9 +227,9 @@ spec:
         cni: canal
         etcd:
           backupConfig:
-            enableAutomaticSnapshots: true
-            snapshotRetention: 5
-            snapshotScheduleCron: "0 */6 * * *"
+            disableAutomaticSnapshots: false
+            retention: "5"
+            scheduleCron: "0 */6 * * *"
       rolloutStrategy:
         type: RollingUpdate
         rollingUpdate:
