@@ -260,7 +260,7 @@ spec:
         size: 30
       iamInstanceProfile: control-plane.cluster-api-provider-aws.sigs.k8s.io
       cloudInit:
-        insecureSkipSecretsManager: false
+        insecureSkipSecretsManager: true
       nonRootVolumes: []
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
@@ -278,7 +278,7 @@ spec:
         size: 30
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
       cloudInit:
-        insecureSkipSecretsManager: false
+        insecureSkipSecretsManager: true
       nonRootVolumes: []
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
